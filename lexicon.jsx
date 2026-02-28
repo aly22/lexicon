@@ -308,9 +308,15 @@ function LoginScreen({ onLogin }) {
       await loadWords();
       setCookie("lexicon_key", password.trim(), 7);
       onLogin();
-    } catch {
-      setError("Invalid password");
-      setApiKey("");
+    } catch (err) {
+      if (err.status === 401) {
+        setError("Invalid password");
+        setApiKey("");
+      } else {
+        // API might be down or not configured yet — allow login anyway
+        setCookie("lexicon_key", password.trim(), 7);
+        onLogin();
+      }
       setChecking(false);
     }
   };
