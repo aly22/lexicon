@@ -1,4 +1,6 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
+import { setApiKey, loadWords, saveWords, loadPlayers, savePlayers, saveGameResult } from "./src/api.js";
+import VocabMemory from "./src/vocab-memory.jsx";
 
 const MAX_WORDS = 25;
 const ROUND_SIZE = 5;
@@ -229,7 +231,35 @@ const CSS = `
     padding: 11px 24px; font-size: 14px; font-weight: 600; color: #94a3b8; cursor: pointer;
   }
 
+  .login { max-width: 360px; width: 100%; display: flex; flex-direction: column; align-items: center; gap: 16px; padding-top: 60px; }
+  .login-form { width: 100%; display: flex; flex-direction: column; gap: 10px; }
+  .login-btn {
+    background: linear-gradient(135deg, #3b82f6, #6366f1); border: none;
+    border-radius: 10px; padding: 12px; font-size: 15px; font-weight: 700;
+    color: white; cursor: pointer; width: 100%;
+  }
+  .login-btn:disabled { opacity: 0.4; cursor: default; }
+
+  .select-screen { max-width: 560px; width: 100%; display: flex; flex-direction: column; gap: 20px; }
+  .game-cards { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .game-card {
+    background: #0f172a; border: 1px solid #1e293b; border-radius: 16px;
+    padding: 32px 20px; text-align: center; cursor: pointer;
+    transition: border-color 0.2s, transform 0.15s;
+  }
+  .game-card:hover { border-color: #3b82f6; transform: translateY(-2px); }
+  .game-card-icon { font-size: 48px; margin-bottom: 12px; }
+  .game-card h2 { font-size: 18px; font-weight: 700; color: #e2e8f0; margin-bottom: 8px; }
+  .game-card p { font-size: 13px; color: #64748b; line-height: 1.4; }
+
+  .back-btn {
+    background: none; border: 1px solid #334155; border-radius: 10px;
+    padding: 8px 16px; font-size: 13px; color: #94a3b8; cursor: pointer;
+    align-self: flex-start;
+  }
+
   @media (max-width: 480px) {
+    .game-cards { grid-template-columns: 1fr; }
     .app { padding: 12px 8px; }
     .logo-title { font-size: 22px; letter-spacing: 5px; }
     .logo-icon { font-size: 34px; }
@@ -250,15 +280,127 @@ const CSS = `
   }
 `;
 
+const setCookie = (name, value, days) => {
+  const d = new Date();
+  d.setTime(d.getTime() + days * 864e5);
+  document.cookie = `${name}=${encodeURIComponent(value)};expires=${d.toUTCString()};path=/;SameSite=Strict`;
+};
+
+const getCookie = (name) => {
+  const match = document.cookie.match(new RegExp(`(?:^|; )${name}=([^;]*)`));
+  return match ? decodeURIComponent(match[1]) : null;
+};
+
 // ---- COMPONENTS ----
 
-function SetupScreen({ onStart }) {
+function LoginScreen({ onLogin }) {
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+  const [checking, setChecking] = useState(false);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!password.trim()) return;
+    setChecking(true);
+    setError("");
+    setApiKey(password.trim());
+    try {
+      await loadWords();
+      setCookie("lexicon_key", password.trim(), 7);
+      onLogin();
+    } catch {
+      setError("Invalid password");
+      setApiKey("");
+      setChecking(false);
+    }
+  };
+
+  return (
+    <div className="login">
+      <div className="logo-area">
+        <div className="logo-icon">🧠</div>
+        <h1 className="logo-title">LEXICON</h1>
+        <p className="logo-sub">Enter password to continue</p>
+      </div>
+      <form className="login-form" onSubmit={handleSubmit}>
+        <input
+          className="input"
+          type="password"
+          placeholder="Password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          autoFocus
+          style={{ width: "100%" }}
+        />
+        {error && <p className="error">{error}</p>}
+        <button className="login-btn" type="submit" disabled={checking || !password.trim()}>
+          {checking ? "Checking..." : "Enter"}
+        </button>
+      </form>
+    </div>
+  );
+}
+
+function GameSelectScreen({ onSelect }) {
+  return (
+    <div className="select-screen">
+      <div className="logo-area">
+        <div className="logo-icon">🧠</div>
+        <h1 className="logo-title">LEXICON</h1>
+        <p className="logo-sub">Choose a game</p>
+      </div>
+      <div className="game-cards">
+        <div className="game-card" onClick={() => onSelect("lexicon")}>
+          <div className="game-card-icon">🃏</div>
+          <h2>Card Match</h2>
+          <p>Match words to their definitions by flipping cards</p>
+        </div>
+        <div className="game-card" onClick={() => onSelect("vocab-memory")}>
+          <div className="game-card-icon">🧩</div>
+          <h2>Vocab Memory</h2>
+          <p>Memorize words on cards, then guess them from memory</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function SetupScreen({ onStart, onBack }) {
   const [words, setWords] = useState(SAMPLE_WORDS);
   const [newWord, setNewWord] = useState("");
   const [newDef, setNewDef] = useState("");
-  const [players, setPlayers] = useState([{ name: "Player 1" }]);
+  const [players, setPlayers] = useState([]);
   const [newPlayer, setNewPlayer] = useState("");
   const [error, setError] = useState("");
+  const [loading, setLoading] = useState(true);
+  const loaded = useRef(false);
+
+  // Load saved data on mount
+  useEffect(() => {
+    if (loaded.current) return;
+    loaded.current = true;
+    Promise.all([loadWords(), loadPlayers()])
+      .then(([w, p]) => {
+        if (Array.isArray(w) && w.length > 0) setWords(w);
+        if (Array.isArray(p) && p.length > 0) setPlayers(p);
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, []);
+
+  // Auto-save words (debounced 1s)
+  useEffect(() => {
+    if (loading) return;
+    const t = setTimeout(() => saveWords(words).catch(() => {}), 1000);
+    return () => clearTimeout(t);
+  }, [words, loading]);
+
+  // Auto-save players (debounced 1s)
+  useEffect(() => {
+    if (loading) return;
+    const t = setTimeout(() => savePlayers(players).catch(() => {}), 1000);
+    return () => clearTimeout(t);
+  }, [players, loading]);
 
   const addWord = () => {
     const w = newWord.trim(), d = newDef.trim();
@@ -280,11 +422,22 @@ function SetupScreen({ onStart }) {
   };
 
   const removePlayer = (i) => {
-    if (players.length <= 1) return;
     setPlayers(players.filter((_, idx) => idx !== i));
   };
 
   const totalRounds = Math.ceil(words.length / ROUND_SIZE);
+
+  if (loading) {
+    return (
+      <div className="setup">
+        <div className="logo-area">
+          <div className="logo-icon">🧠</div>
+          <h1 className="logo-title">LEXICON</h1>
+          <p className="logo-sub">Loading saved data...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="setup">
@@ -293,6 +446,7 @@ function SetupScreen({ onStart }) {
         <h1 className="logo-title">LEXICON</h1>
         <p className="logo-sub">Match words to their meanings</p>
       </div>
+      <button className="back-btn" onClick={onBack}>← Back to Games</button>
 
       <div className="section">
         <h2 className="section-title">Vocabulary Cards</h2>
@@ -327,7 +481,7 @@ function SetupScreen({ onStart }) {
           {players.map((p, i) => (
             <div key={i} className="player-chip">
               <span>{p.name}</span>
-              {players.length > 1 && <button onClick={() => removePlayer(i)} className="chip-x">×</button>}
+              <button onClick={() => removePlayer(i)} className="chip-x">×</button>
             </div>
           ))}
         </div>
@@ -342,7 +496,7 @@ function SetupScreen({ onStart }) {
       </div>
 
       {error && <p className="error">{error}</p>}
-      <button className="start-btn" disabled={words.length < 3} onClick={() => onStart(words, players)}>
+      <button className="start-btn" disabled={words.length < 3 || players.length < 1} onClick={() => onStart(words, players)}>
         Start Game
       </button>
     </div>
@@ -574,7 +728,7 @@ function ReviewScreen({ words, onDone }) {
   );
 }
 
-function ResultScreen({ data, onRestart, onNewGame }) {
+function ResultScreen({ data, onRestart, onNewGame, onBackToMenu }) {
   const { scores, words } = data;
   const isMulti = scores.length > 1;
   const totalAttempts = scores.reduce((a, s) => a + s.attempts, 0);
@@ -619,6 +773,7 @@ function ResultScreen({ data, onRestart, onNewGame }) {
       <div className="result-btns">
         <button className="restart-btn" onClick={onRestart}>Play Again</button>
         <button className="newgame-btn" onClick={onNewGame}>New Words</button>
+        <button className="newgame-btn" onClick={onBackToMenu}>Back to Games</button>
       </div>
     </div>
   );
@@ -627,7 +782,10 @@ function ResultScreen({ data, onRestart, onNewGame }) {
 // ---- MAIN ----
 
 export default function App() {
-  const [screen, setScreen] = useState("setup");
+  const savedKey = getCookie("lexicon_key");
+  if (savedKey) setApiKey(savedKey);
+
+  const [screen, setScreen] = useState(savedKey ? "select" : "login");
   const [allWords, setAllWords] = useState([]);
   const [players, setPlayers] = useState([]);
   const [rounds, setRounds] = useState([]);
@@ -635,6 +793,14 @@ export default function App() {
   const [scores, setScores] = useState([]);
   const [currentPlayer, setCurrentPlayer] = useState(0);
   const [finalScores, setFinalScores] = useState(null);
+
+  const backToMenu = () => {
+    setScreen("select");
+    setAllWords([]);
+    setPlayers([]);
+    setRounds([]);
+    setFinalScores(null);
+  };
 
   const startGame = (words, pls) => {
     setAllWords(words);
@@ -659,6 +825,16 @@ export default function App() {
   };
 
   const handleReviewDone = () => {
+    const totalAttempts = finalScores.reduce((a, s) => a + s.attempts, 0);
+    const efficiency = Math.round((allWords.length / Math.max(totalAttempts, 1)) * 100);
+    saveGameResult({
+      date: new Date().toISOString(),
+      wordCount: allWords.length,
+      players: players.map((p) => p.name),
+      scores: finalScores,
+      totalAttempts,
+      efficiency,
+    }).catch(() => {});
     setScreen("result");
   };
 
@@ -684,7 +860,11 @@ export default function App() {
     <>
       <style>{CSS}</style>
       <div className="app">
-        {screen === "setup" && <SetupScreen onStart={startGame} />}
+        {screen === "login" && <LoginScreen onLogin={() => setScreen("select")} />}
+        {screen === "select" && (
+          <GameSelectScreen onSelect={(g) => setScreen(g === "lexicon" ? "setup" : "vm")} />
+        )}
+        {screen === "setup" && <SetupScreen onStart={startGame} onBack={backToMenu} />}
         {screen === "game" && rounds[currentRound] && (
           <RoundScreen
             key={currentRound}
@@ -705,8 +885,10 @@ export default function App() {
             data={{ scores: finalScores, words: allWords, players }}
             onRestart={restart}
             onNewGame={newGame}
+            onBackToMenu={backToMenu}
           />
         )}
+        {screen === "vm" && <VocabMemory onBack={backToMenu} />}
       </div>
     </>
   );
