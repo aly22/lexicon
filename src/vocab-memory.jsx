@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from "react";
-import { loadVMWords, saveVMWords, loadVMPlayers, saveVMPlayers, saveVMGameResult } from "./api.js";
+import { loadGameData, saveGameData, saveVMGameResult } from "./api.js";
 
 const shuffle = (arr) => {
   const a = [...arr];
@@ -292,6 +292,8 @@ function VMSetupScreen({ onStart, onBack }) {
   const [wordText, setWordText] = useState("");
   const [memorizeTime, setMemorizeTime] = useState(15);
   const [loading, setLoading] = useState(true);
+  const [saveStatus, setSaveStatus] = useState(null);
+  const [loadStatus, setLoadStatus] = useState(null);
   const loaded = useRef(false);
 
   const words = useMemo(() => {
@@ -310,8 +312,8 @@ function VMSetupScreen({ onStart, onBack }) {
   useEffect(() => {
     if (loaded.current) return;
     loaded.current = true;
-    Promise.all([loadVMWords(), loadVMPlayers()])
-      .then(([w, p]) => {
+    loadGameData("vm")
+      .then(({ words: w, players: p }) => {
         if (Array.isArray(w) && w.length > 0) setWordText(w.join(", "));
         if (Array.isArray(p) && p.length > 0) setPlayerNames(p);
       })
@@ -319,18 +321,30 @@ function VMSetupScreen({ onStart, onBack }) {
       .finally(() => setLoading(false));
   }, []);
 
-  useEffect(() => {
-    if (loading) return;
-    const t = setTimeout(() => saveVMWords(words).catch(() => {}), 1000);
-    return () => clearTimeout(t);
-  }, [words, loading]);
+  const handleSave = async () => {
+    setSaveStatus("saving");
+    try {
+      const valid = playerNames.filter(n => n.trim());
+      await saveGameData("vm", words, valid);
+      setSaveStatus("saved");
+    } catch {
+      setSaveStatus("error");
+    }
+    setTimeout(() => setSaveStatus(null), 2000);
+  };
 
-  useEffect(() => {
-    if (loading) return;
-    const valid = playerNames.filter(n => n.trim());
-    const t = setTimeout(() => saveVMPlayers(valid).catch(() => {}), 1000);
-    return () => clearTimeout(t);
-  }, [playerNames, loading]);
+  const handleLoad = async () => {
+    setLoadStatus("loading");
+    try {
+      const { words: w, players: p } = await loadGameData("vm");
+      if (Array.isArray(w) && w.length > 0) setWordText(w.join(", "));
+      if (Array.isArray(p) && p.length > 0) setPlayerNames(p);
+      setLoadStatus("loaded");
+    } catch {
+      setLoadStatus("error");
+    }
+    setTimeout(() => setLoadStatus(null), 2000);
+  };
 
   const addPlayer = () => {
     if (playerNames.length >= 6) return;
@@ -419,6 +433,14 @@ function VMSetupScreen({ onStart, onBack }) {
         </div>
       </div>
 
+      <div style={{ display: "flex", gap: 10 }}>
+        <button className="vm-back-btn" style={{ flex: 1, textAlign: "center" }} onClick={handleSave} disabled={saveStatus === "saving"}>
+          {saveStatus === "saving" ? "Saving..." : saveStatus === "saved" ? "Saved!" : saveStatus === "error" ? "Save Failed" : "Save"}
+        </button>
+        <button className="vm-back-btn" style={{ flex: 1, textAlign: "center" }} onClick={handleLoad} disabled={loadStatus === "loading"}>
+          {loadStatus === "loading" ? "Loading..." : loadStatus === "loaded" ? "Loaded!" : loadStatus === "error" ? "Load Failed" : "Load"}
+        </button>
+      </div>
       <button className="vm-start-btn" disabled={!canStart}
         onClick={() => onStart(words, validPlayers, memorizeTime)}>
         Start Game

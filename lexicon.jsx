@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
-import { setApiKey, loadWords, saveWords, loadPlayers, savePlayers, saveGameResult } from "./src/api.js";
+import { setApiKey, loadGameData, saveGameData, saveGameResult } from "./src/api.js";
 import VocabMemory from "./src/vocab-memory.jsx";
 
 const MAX_WORDS = 25;
@@ -305,7 +305,7 @@ function LoginScreen({ onLogin }) {
     setError("");
     setApiKey(password.trim());
     try {
-      await loadWords();
+      await loadGameData("lexicon");
       setCookie("lexicon_key", password.trim(), 7);
       onLogin();
     } catch (err) {
@@ -379,14 +379,16 @@ function SetupScreen({ onStart, onBack }) {
   const [newPlayer, setNewPlayer] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
+  const [saveStatus, setSaveStatus] = useState(null);
+  const [loadStatus, setLoadStatus] = useState(null);
   const loaded = useRef(false);
 
   // Load saved data on mount
   useEffect(() => {
     if (loaded.current) return;
     loaded.current = true;
-    Promise.all([loadWords(), loadPlayers()])
-      .then(([w, p]) => {
+    loadGameData("lexicon")
+      .then(({ words: w, players: p }) => {
         if (Array.isArray(w) && w.length > 0) setWords(w);
         if (Array.isArray(p) && p.length > 0) setPlayers(p);
       })
@@ -394,19 +396,29 @@ function SetupScreen({ onStart, onBack }) {
       .finally(() => setLoading(false));
   }, []);
 
-  // Auto-save words (debounced 1s)
-  useEffect(() => {
-    if (loading) return;
-    const t = setTimeout(() => saveWords(words).catch(() => {}), 1000);
-    return () => clearTimeout(t);
-  }, [words, loading]);
+  const handleSave = async () => {
+    setSaveStatus("saving");
+    try {
+      await saveGameData("lexicon", words, players);
+      setSaveStatus("saved");
+    } catch {
+      setSaveStatus("error");
+    }
+    setTimeout(() => setSaveStatus(null), 2000);
+  };
 
-  // Auto-save players (debounced 1s)
-  useEffect(() => {
-    if (loading) return;
-    const t = setTimeout(() => savePlayers(players).catch(() => {}), 1000);
-    return () => clearTimeout(t);
-  }, [players, loading]);
+  const handleLoad = async () => {
+    setLoadStatus("loading");
+    try {
+      const { words: w, players: p } = await loadGameData("lexicon");
+      if (Array.isArray(w) && w.length > 0) setWords(w);
+      if (Array.isArray(p) && p.length > 0) setPlayers(p);
+      setLoadStatus("loaded");
+    } catch {
+      setLoadStatus("error");
+    }
+    setTimeout(() => setLoadStatus(null), 2000);
+  };
 
   const addWord = () => {
     const w = newWord.trim(), d = newDef.trim();
@@ -502,6 +514,14 @@ function SetupScreen({ onStart, onBack }) {
       </div>
 
       {error && <p className="error">{error}</p>}
+      <div style={{ display: "flex", gap: 8 }}>
+        <button className="newgame-btn" style={{ flex: 1 }} onClick={handleSave} disabled={saveStatus === "saving"}>
+          {saveStatus === "saving" ? "Saving..." : saveStatus === "saved" ? "Saved!" : saveStatus === "error" ? "Save Failed" : "Save"}
+        </button>
+        <button className="newgame-btn" style={{ flex: 1 }} onClick={handleLoad} disabled={loadStatus === "loading"}>
+          {loadStatus === "loading" ? "Loading..." : loadStatus === "loaded" ? "Loaded!" : loadStatus === "error" ? "Load Failed" : "Load"}
+        </button>
+      </div>
       <button className="start-btn" disabled={words.length < 3 || players.length < 1} onClick={() => onStart(words, players)}>
         Start Game
       </button>
