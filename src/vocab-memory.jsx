@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from "react";
-import { loadSaves, saveWordList, deletePlayer, deleteWordList, saveVMGameResult } from "./api.js";
+import { loadSaves, saveWordList, deletePlayer, deleteWordList } from "./api.js";
 
 const shuffle = (arr) => {
   const a = [...arr];
@@ -538,6 +538,13 @@ function VMGameScreen({ words: initialWords, players, memorizeTime: baseTime, on
   useEffect(() => { scoresRef.current = scores; }, [scores]);
   useEffect(() => { playerIdxRef.current = currentPlayerIdx; }, [currentPlayerIdx]);
 
+  // Detect game end when all cards are removed
+  useEffect(() => {
+    if (cards.length > 0 && cards.every(c => c.removed)) {
+      onEnd(players, scoresRef.current);
+    }
+  }, [cards]);
+
   const showToast = useCallback((text, type) => {
     setToast({ text, type });
     clearTimeout(toastTimerRef.current);
@@ -616,13 +623,6 @@ function VMGameScreen({ words: initialWords, players, memorizeTime: baseTime, on
         });
         setCardStatus(prev => { const n = { ...prev }; delete n[idx]; return n; });
         setProcessing(false);
-
-        // Use setTimeout(0) so React flushes state first
-        setTimeout(() => {
-          if (remaining <= 0) {
-            onEnd(players, { ...scoresRef.current, [player]: scoresRef.current[player] });
-          }
-        }, 0);
       }, 1200);
     } else {
       showToast(`Wrong! It was "${card.word}"`, "wrong");
@@ -854,15 +854,6 @@ export default function VocabMemory({ onBack }) {
 
   const handleEnd = (players, scores) => {
     setResult({ players, scores });
-    const maxScore = Math.max(...Object.values(scores));
-    const winners = players.filter(p => scores[p] === maxScore);
-    saveVMGameResult({
-      date: new Date().toISOString(),
-      wordCount: gameConfig.words.length,
-      players,
-      scores,
-      winner: winners.join(", "),
-    }).catch(() => {});
     setScreen("result");
   };
 
