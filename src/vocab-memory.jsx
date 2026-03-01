@@ -321,13 +321,25 @@ function VMSetupScreen({ onStart, onBack }) {
     setSavesLoading(false);
   };
 
-  const handleSave = async () => {
+  const handleSave = async (playerName) => {
+    const target = (playerName || saveTargetPlayer).trim();
+    const validNames = playerNames.filter((n) => n.trim());
     if (!savePlayerPicker) {
+      if (validNames.length === 1) {
+        setSaveStatus("saving");
+        try {
+          await saveWordList("vm", validNames[0], words);
+          setSaveStatus("saved");
+          if (showSaves) await fetchSaves();
+        } catch { setSaveStatus("error"); }
+        setTimeout(() => setSaveStatus(null), 2000);
+        return;
+      }
       await fetchSaves();
+      if (validNames.length > 0) setSaveTargetPlayer(validNames[0]);
       setSavePlayerPicker(true);
       return;
     }
-    const target = saveTargetPlayer.trim();
     if (!target) { setError("Enter a player name to save under"); return; }
     setSaveStatus("saving");
     setSavePlayerPicker(false);
@@ -455,7 +467,7 @@ function VMSetupScreen({ onStart, onBack }) {
               <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 8 }}>
                 {allNames.map((p) => (
                   <button key={p} className="vm-word-tag" style={{ cursor: "pointer", border: "none" }}
-                    onClick={() => setSaveTargetPlayer(p)}>
+                    onClick={() => handleSave(p)}>
                     {p}
                   </button>
                 ))}
