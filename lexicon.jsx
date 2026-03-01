@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
-import { setApiKey, loadSaves, saveWordList, deletePlayer, deleteWordList, saveGameResult } from "./src/api.js";
+import { setApiKey, loadSaves, saveWordList, deletePlayer, deleteWordList } from "./src/api.js";
 import VocabMemory from "./src/vocab-memory.jsx";
 
 const MAX_WORDS = 25;
@@ -375,14 +375,12 @@ function SetupScreen({ onStart, onBack }) {
   const [words, setWords] = useState(SAMPLE_WORDS);
   const [newWord, setNewWord] = useState("");
   const [newDef, setNewDef] = useState("");
-  const [players, setPlayers] = useState([]);
-  const [newPlayer, setNewPlayer] = useState("");
+  const [playerName, setPlayerName] = useState("");
   const [error, setError] = useState("");
   const [saveStatus, setSaveStatus] = useState(null);
   const [showSaves, setShowSaves] = useState(false);
   const [saves, setSaves] = useState({});
   const [savesLoading, setSavesLoading] = useState(false);
-  const [savePlayerPicker, setSavePlayerPicker] = useState(false);
 
   const fetchSaves = async () => {
     setSavesLoading(true);
@@ -393,27 +391,18 @@ function SetupScreen({ onStart, onBack }) {
     setSavesLoading(false);
   };
 
-  const handleSave = async (playerName) => {
-    if (playerName) {
-      setSaveStatus("saving");
-      setSavePlayerPicker(false);
-      try {
-        await saveWordList("lexicon", playerName, words);
-        setSaveStatus("saved");
-        if (showSaves) await fetchSaves();
-      } catch { setSaveStatus("error"); }
-      setTimeout(() => setSaveStatus(null), 2000);
+  const handleSave = async () => {
+    if (!playerName.trim()) {
+      setError("Enter a player name to save under");
       return;
     }
-    if (players.length === 1) {
-      return handleSave(players[0].name);
-    }
-    if (players.length > 1) {
-      await fetchSaves();
-      setSavePlayerPicker(true);
-      return;
-    }
-    setError("Add at least one player to save under");
+    setSaveStatus("saving");
+    try {
+      await saveWordList("lexicon", playerName.trim(), words);
+      setSaveStatus("saved");
+      if (showSaves) await fetchSaves();
+    } catch { setSaveStatus("error"); }
+    setTimeout(() => setSaveStatus(null), 2000);
   };
 
   const handleToggleSaves = async () => {
@@ -431,8 +420,9 @@ function SetupScreen({ onStart, onBack }) {
     await fetchSaves();
   };
 
-  const handleLoadWordList = (wordList) => {
+  const handleLoadWordList = (wordList, player) => {
     setWords(wordList);
+    setPlayerName(player);
     setShowSaves(false);
   };
 
@@ -446,18 +436,6 @@ function SetupScreen({ onStart, onBack }) {
   };
 
   const removeWord = (i) => setWords(words.filter((_, idx) => idx !== i));
-
-  const addPlayer = () => {
-    const p = newPlayer.trim();
-    if (!p) return;
-    if (players.length >= 4) { setError("Max 4 players"); return; }
-    setPlayers([...players, { name: p }]);
-    setNewPlayer(""); setError("");
-  };
-
-  const removePlayer = (i) => {
-    setPlayers(players.filter((_, idx) => idx !== i));
-  };
 
   const totalRounds = Math.ceil(words.length / ROUND_SIZE);
 
@@ -498,44 +476,15 @@ function SetupScreen({ onStart, onBack }) {
       </div>
 
       <div className="section">
-        <h2 className="section-title">Players</h2>
-        <div className="player-list">
-          {players.map((p, i) => (
-            <div key={i} className="player-chip">
-              <span>{p.name}</span>
-              <button onClick={() => removePlayer(i)} className="chip-x">×</button>
-            </div>
-          ))}
-        </div>
-        {players.length < 4 && (
-          <div className="input-row">
-            <input className="input input-player" placeholder="Add player name" value={newPlayer}
-              onChange={(e) => setNewPlayer(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && addPlayer()} />
-            <button className="add-btn" onClick={addPlayer}>+</button>
-          </div>
-        )}
+        <h2 className="section-title">Player</h2>
+        <input className="input" style={{ width: "100%" }} placeholder="Your name" value={playerName}
+          onChange={(e) => setPlayerName(e.target.value)} />
       </div>
 
       {error && <p className="error">{error}</p>}
 
-      {savePlayerPicker && (
-        <div className="section">
-          <h2 className="section-title">Save under which player?</h2>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-            {players.map((p) => (
-              <button key={p.name} className="player-chip" style={{ cursor: "pointer", border: "none" }}
-                onClick={() => handleSave(p.name)}>
-                {p.name}
-              </button>
-            ))}
-          </div>
-          <button className="back-btn" style={{ marginTop: 8 }} onClick={() => setSavePlayerPicker(false)}>Cancel</button>
-        </div>
-      )}
-
       <div style={{ display: "flex", gap: 8 }}>
-        <button className="newgame-btn" style={{ flex: 1 }} onClick={() => handleSave()} disabled={saveStatus === "saving" || savePlayerPicker}>
+        <button className="newgame-btn" style={{ flex: 1 }} onClick={handleSave} disabled={saveStatus === "saving"}>
           {saveStatus === "saving" ? "Saving..." : saveStatus === "saved" ? "Saved!" : saveStatus === "error" ? "Save Failed" : "Save"}
         </button>
         <button className="newgame-btn" style={{ flex: 1 }} onClick={handleToggleSaves}>
@@ -559,7 +508,7 @@ function SetupScreen({ onStart, onBack }) {
                 </div>
                 {lists.map((wl, idx) => (
                   <div key={idx} className="word-chip" style={{ cursor: "pointer", marginBottom: 4 }}
-                    onClick={() => handleLoadWordList(wl)}>
+                    onClick={() => handleLoadWordList(wl, player)}>
                     <div className="word-chip-text">
                       <span className="def">
                         #{idx + 1} — {wl.slice(0, 3).map((w) => w.word).join(", ")}
@@ -575,7 +524,7 @@ function SetupScreen({ onStart, onBack }) {
         </div>
       )}
 
-      <button className="start-btn" disabled={words.length < 3 || players.length < 1} onClick={() => onStart(words, players)}>
+      <button className="start-btn" disabled={words.length < 3 || !playerName.trim()} onClick={() => onStart(words, [{ name: playerName.trim() }])}>
         Start Game
       </button>
     </div>
@@ -904,16 +853,6 @@ export default function App() {
   };
 
   const handleReviewDone = () => {
-    const totalAttempts = finalScores.reduce((a, s) => a + s.attempts, 0);
-    const efficiency = Math.round((allWords.length / Math.max(totalAttempts, 1)) * 100);
-    saveGameResult({
-      date: new Date().toISOString(),
-      wordCount: allWords.length,
-      players: players.map((p) => p.name),
-      scores: finalScores,
-      totalAttempts,
-      efficiency,
-    }).catch(() => {});
     setScreen("result");
   };
 
