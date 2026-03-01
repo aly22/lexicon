@@ -394,25 +394,14 @@ function SetupScreen({ onStart, onBack }) {
     setSavesLoading(false);
   };
 
-  const handleSave = async (playerName) => {
-    const target = (playerName || saveTargetPlayer).trim();
-    if (!savePlayerPicker) {
-      // If exactly one player, save directly under their name
-      if (players.length === 1) {
-        setSaveStatus("saving");
-        try {
-          await saveWordList("lexicon", players[0].name, words);
-          setSaveStatus("saved");
-          if (showSaves) await fetchSaves();
-        } catch { setSaveStatus("error"); }
-        setTimeout(() => setSaveStatus(null), 2000);
-        return;
-      }
+  const handleSave = async () => {
+    const existingPlayers = Object.keys(saves);
+    if (existingPlayers.length > 0 && !savePlayerPicker) {
       await fetchSaves();
-      if (players.length > 0) setSaveTargetPlayer(players[0].name);
       setSavePlayerPicker(true);
       return;
     }
+    const target = saveTargetPlayer.trim();
     if (!target) { setError("Enter a player name to save under"); return; }
     setSaveStatus("saving");
     setSavePlayerPicker(false);
@@ -537,19 +526,16 @@ function SetupScreen({ onStart, onBack }) {
               onKeyDown={(e) => e.key === "Enter" && handleSave()} />
             <button className="add-btn" onClick={handleSave}>Save</button>
           </div>
-          {(() => {
-            const allNames = [...new Set([...players.map((p) => p.name), ...Object.keys(saves)])];
-            return allNames.length > 0 && (
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 8 }}>
-                {allNames.map((p) => (
-                  <button key={p} className="player-chip" style={{ cursor: "pointer", border: "none" }}
-                    onClick={() => handleSave(p)}>
-                    {p}
-                  </button>
-                ))}
-              </div>
-            );
-          })()}
+          {Object.keys(saves).length > 0 && (
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 8 }}>
+              {Object.keys(saves).map((p) => (
+                <button key={p} className="player-chip" style={{ cursor: "pointer", border: "none" }}
+                  onClick={() => { setSaveTargetPlayer(p); }}>
+                  {p}
+                </button>
+              ))}
+            </div>
+          )}
           <button className="back-btn" style={{ marginTop: 8 }} onClick={() => setSavePlayerPicker(false)}>Cancel</button>
         </div>
       )}
