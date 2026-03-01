@@ -334,8 +334,7 @@ function VMSetupScreen({ onStart, onBack }) {
       return;
     }
     if (validNames.length === 1) {
-      handleSave(validNames[0]);
-      return;
+      return handleSave(validNames[0]);
     }
     if (validNames.length > 1) {
       await fetchSaves();
@@ -461,7 +460,7 @@ function VMSetupScreen({ onStart, onBack }) {
       )}
 
       <div style={{ display: "flex", gap: 10 }}>
-        <button className="vm-back-btn" style={{ flex: 1, textAlign: "center" }} onClick={handleSave} disabled={saveStatus === "saving" || savePlayerPicker}>
+        <button className="vm-back-btn" style={{ flex: 1, textAlign: "center" }} onClick={() => handleSave()} disabled={saveStatus === "saving" || savePlayerPicker}>
           {saveStatus === "saving" ? "Saving..." : saveStatus === "saved" ? "Saved!" : saveStatus === "error" ? "Save Failed" : "Save"}
         </button>
         <button className="vm-back-btn" style={{ flex: 1, textAlign: "center" }} onClick={handleToggleSaves}>

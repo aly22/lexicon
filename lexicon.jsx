@@ -406,8 +406,7 @@ function SetupScreen({ onStart, onBack }) {
       return;
     }
     if (players.length === 1) {
-      handleSave(players[0].name);
-      return;
+      return handleSave(players[0].name);
     }
     if (players.length > 1) {
       await fetchSaves();
@@ -536,7 +535,7 @@ function SetupScreen({ onStart, onBack }) {
       )}
 
       <div style={{ display: "flex", gap: 8 }}>
-        <button className="newgame-btn" style={{ flex: 1 }} onClick={handleSave} disabled={saveStatus === "saving" || savePlayerPicker}>
+        <button className="newgame-btn" style={{ flex: 1 }} onClick={() => handleSave()} disabled={saveStatus === "saving" || savePlayerPicker}>
           {saveStatus === "saving" ? "Saving..." : saveStatus === "saved" ? "Saved!" : saveStatus === "error" ? "Save Failed" : "Save"}
         </button>
         <button className="newgame-btn" style={{ flex: 1 }} onClick={handleToggleSaves}>
