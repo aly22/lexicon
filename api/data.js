@@ -6,8 +6,8 @@ const redis = new Redis({
 });
 
 const KEYS = {
-  lexicon: { words: "lexicon:words", players: "lexicon:players" },
-  vm: { words: "lexicon:vmwords", players: "lexicon:vmplayers" },
+  lexicon: { words: "lexicon:words", players: "lexicon:players", saves: "lexicon:saves" },
+  vm: { words: "lexicon:vmwords", players: "lexicon:vmplayers", saves: "lexicon:vmsaves" },
 };
 
 export default async function handler(req, res) {
@@ -23,6 +23,11 @@ export default async function handler(req, res) {
     }
 
     if (req.method === "GET") {
+      const action = req.query.action;
+      if (action === "saves") {
+        const saves = await redis.get(keys.saves);
+        return res.json({ saves: saves || {} });
+      }
       const results = await redis.pipeline()
         .get(keys.words)
         .get(keys.players)
@@ -31,7 +36,34 @@ export default async function handler(req, res) {
     }
 
     if (req.method === "POST") {
-      const { words, players } = req.body;
+      const { action, player, words, players, index } = req.body;
+
+      if (action === "save") {
+        const saves = (await redis.get(keys.saves)) || {};
+        if (!saves[player]) saves[player] = [];
+        saves[player].push(words);
+        await redis.set(keys.saves, saves);
+        return res.json({ ok: true });
+      }
+
+      if (action === "deletePlayer") {
+        const saves = (await redis.get(keys.saves)) || {};
+        delete saves[player];
+        await redis.set(keys.saves, saves);
+        return res.json({ ok: true });
+      }
+
+      if (action === "deleteWords") {
+        const saves = (await redis.get(keys.saves)) || {};
+        if (saves[player]) {
+          saves[player].splice(index, 1);
+          if (saves[player].length === 0) delete saves[player];
+        }
+        await redis.set(keys.saves, saves);
+        return res.json({ ok: true });
+      }
+
+      // Legacy save (words/players)
       const pipe = redis.pipeline();
       if (words !== undefined) pipe.set(keys.words, words);
       if (players !== undefined) pipe.set(keys.players, players);

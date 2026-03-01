@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from "react";
-import { loadGameData, saveGameData, saveVMGameResult } from "./api.js";
+import { loadSaves, saveWordList, deletePlayer, deleteWordList, saveVMGameResult } from "./api.js";
 
 const shuffle = (arr) => {
   const a = [...arr];
@@ -291,10 +291,13 @@ function VMSetupScreen({ onStart, onBack }) {
   const [playerNames, setPlayerNames] = useState([]);
   const [wordText, setWordText] = useState("");
   const [memorizeTime, setMemorizeTime] = useState(15);
-  const [loading, setLoading] = useState(true);
   const [saveStatus, setSaveStatus] = useState(null);
-  const [loadStatus, setLoadStatus] = useState(null);
-  const loaded = useRef(false);
+  const [showSaves, setShowSaves] = useState(false);
+  const [saves, setSaves] = useState({});
+  const [savesLoading, setSavesLoading] = useState(false);
+  const [savePlayerPicker, setSavePlayerPicker] = useState(false);
+  const [saveTargetPlayer, setSaveTargetPlayer] = useState("");
+  const [error, setError] = useState("");
 
   const words = useMemo(() => {
     const parsed = wordText
@@ -309,41 +312,53 @@ function VMSetupScreen({ onStart, onBack }) {
     return unique;
   }, [wordText]);
 
-  useEffect(() => {
-    if (loaded.current) return;
-    loaded.current = true;
-    loadGameData("vm")
-      .then(({ words: w, players: p }) => {
-        if (Array.isArray(w) && w.length > 0) setWordText(w.join(", "));
-        if (Array.isArray(p) && p.length > 0) setPlayerNames(p);
-      })
-      .catch(() => {})
-      .finally(() => setLoading(false));
-  }, []);
+  const fetchSaves = async () => {
+    setSavesLoading(true);
+    try {
+      const { saves: s } = await loadSaves("vm");
+      setSaves(s || {});
+    } catch { setSaves({}); }
+    setSavesLoading(false);
+  };
 
   const handleSave = async () => {
-    setSaveStatus("saving");
-    try {
-      const valid = playerNames.filter(n => n.trim());
-      await saveGameData("vm", words, valid);
-      setSaveStatus("saved");
-    } catch {
-      setSaveStatus("error");
+    const existingPlayers = Object.keys(saves);
+    if (existingPlayers.length > 0 && !savePlayerPicker) {
+      await fetchSaves();
+      setSavePlayerPicker(true);
+      return;
     }
+    const target = saveTargetPlayer.trim();
+    if (!target) { setError("Enter a player name to save under"); return; }
+    setSaveStatus("saving");
+    setSavePlayerPicker(false);
+    try {
+      await saveWordList("vm", target, words);
+      setSaveStatus("saved");
+      setSaveTargetPlayer("");
+      if (showSaves) await fetchSaves();
+    } catch { setSaveStatus("error"); }
     setTimeout(() => setSaveStatus(null), 2000);
   };
 
-  const handleLoad = async () => {
-    setLoadStatus("loading");
-    try {
-      const { words: w, players: p } = await loadGameData("vm");
-      if (Array.isArray(w) && w.length > 0) setWordText(w.join(", "));
-      if (Array.isArray(p) && p.length > 0) setPlayerNames(p);
-      setLoadStatus("loaded");
-    } catch {
-      setLoadStatus("error");
-    }
-    setTimeout(() => setLoadStatus(null), 2000);
+  const handleToggleSaves = async () => {
+    if (!showSaves) await fetchSaves();
+    setShowSaves(!showSaves);
+  };
+
+  const handleDeletePlayer = async (player) => {
+    await deletePlayer("vm", player);
+    await fetchSaves();
+  };
+
+  const handleDeleteWordList = async (player, index) => {
+    await deleteWordList("vm", player, index);
+    await fetchSaves();
+  };
+
+  const handleLoadWordList = (wordList) => {
+    setWordText(wordList.join(", "));
+    setShowSaves(false);
   };
 
   const addPlayer = () => {
@@ -366,15 +381,6 @@ function VMSetupScreen({ onStart, onBack }) {
 
   const validPlayers = playerNames.filter(n => n.trim().length > 0);
   const canStart = words.length >= 4 && validPlayers.length >= 1;
-
-  if (loading) {
-    return (
-      <div className="vm-setup">
-        <h1 className="vm-title">Vocab Memory</h1>
-        <p className="vm-subtitle">Loading saved data...</p>
-      </div>
-    );
-  }
 
   return (
     <div className="vm-setup">
@@ -433,14 +439,70 @@ function VMSetupScreen({ onStart, onBack }) {
         </div>
       </div>
 
+      {error && <p style={{ color: "#f87171", fontSize: 13, textAlign: "center" }}>{error}</p>}
+
+      {savePlayerPicker && (
+        <div className="vm-section">
+          <h2>Save under which player?</h2>
+          <div className="vm-player-row">
+            <input className="vm-input" placeholder="Player name" value={saveTargetPlayer}
+              onChange={(e) => setSaveTargetPlayer(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && handleSave()} />
+            <button className="vm-remove-btn" style={{ background: "rgba(83,215,105,0.2)", color: "#53d769" }} onClick={handleSave}>Save</button>
+          </div>
+          {Object.keys(saves).length > 0 && (
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 8 }}>
+              {Object.keys(saves).map((p) => (
+                <button key={p} className="vm-word-tag" style={{ cursor: "pointer", border: "none" }}
+                  onClick={() => setSaveTargetPlayer(p)}>
+                  {p}
+                </button>
+              ))}
+            </div>
+          )}
+          <button className="vm-back-btn" style={{ marginTop: 8 }} onClick={() => setSavePlayerPicker(false)}>Cancel</button>
+        </div>
+      )}
+
       <div style={{ display: "flex", gap: 10 }}>
-        <button className="vm-back-btn" style={{ flex: 1, textAlign: "center" }} onClick={handleSave} disabled={saveStatus === "saving"}>
+        <button className="vm-back-btn" style={{ flex: 1, textAlign: "center" }} onClick={handleSave} disabled={saveStatus === "saving" || savePlayerPicker}>
           {saveStatus === "saving" ? "Saving..." : saveStatus === "saved" ? "Saved!" : saveStatus === "error" ? "Save Failed" : "Save"}
         </button>
-        <button className="vm-back-btn" style={{ flex: 1, textAlign: "center" }} onClick={handleLoad} disabled={loadStatus === "loading"}>
-          {loadStatus === "loading" ? "Loading..." : loadStatus === "loaded" ? "Loaded!" : loadStatus === "error" ? "Load Failed" : "Load"}
+        <button className="vm-back-btn" style={{ flex: 1, textAlign: "center" }} onClick={handleToggleSaves}>
+          {showSaves ? "Hide Saved" : "Load"}
         </button>
       </div>
+
+      {showSaves && (
+        <div className="vm-section">
+          <h2>Saved Data</h2>
+          {savesLoading ? (
+            <p className="vm-hint">Loading...</p>
+          ) : Object.keys(saves).length === 0 ? (
+            <p className="vm-hint">No saved word lists yet.</p>
+          ) : (
+            Object.entries(saves).map(([player, lists]) => (
+              <div key={player} style={{ marginBottom: 12 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+                  <strong style={{ color: "#eef2f7", fontSize: 14 }}>{player}</strong>
+                  <button className="vm-remove-btn" style={{ width: 28, height: 28, fontSize: "0.9rem" }} onClick={() => handleDeletePlayer(player)}>×</button>
+                </div>
+                {lists.map((wl, idx) => (
+                  <div key={idx} className="vm-word-tag" style={{ cursor: "pointer", marginBottom: 4, display: "flex", justifyContent: "space-between", width: "100%", borderRadius: 8, padding: "8px 12px" }}
+                    onClick={() => handleLoadWordList(wl)}>
+                    <span style={{ fontSize: "0.85rem" }}>
+                      #{idx + 1} — {wl.slice(0, 3).join(", ")}
+                      {wl.length > 3 ? ` +${wl.length - 3} more` : ""}
+                    </span>
+                    <span className="vm-tag-remove" onClick={(e) => { e.stopPropagation(); handleDeleteWordList(player, idx); }}>×</span>
+                  </div>
+                ))}
+              </div>
+            ))
+          )}
+        </div>
+      )}
+
       <button className="vm-start-btn" disabled={!canStart}
         onClick={() => onStart(words, validPlayers, memorizeTime)}>
         Start Game

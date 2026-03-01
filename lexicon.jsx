@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
-import { setApiKey, loadGameData, saveGameData, saveGameResult } from "./src/api.js";
+import { setApiKey, loadSaves, saveWordList, deletePlayer, deleteWordList, saveGameResult } from "./src/api.js";
 import VocabMemory from "./src/vocab-memory.jsx";
 
 const MAX_WORDS = 25;
@@ -305,7 +305,7 @@ function LoginScreen({ onLogin }) {
     setError("");
     setApiKey(password.trim());
     try {
-      await loadGameData("lexicon");
+      await loadSaves("lexicon");
       setCookie("lexicon_key", password.trim(), 7);
       onLogin();
     } catch (err) {
@@ -378,46 +378,60 @@ function SetupScreen({ onStart, onBack }) {
   const [players, setPlayers] = useState([]);
   const [newPlayer, setNewPlayer] = useState("");
   const [error, setError] = useState("");
-  const [loading, setLoading] = useState(true);
   const [saveStatus, setSaveStatus] = useState(null);
-  const [loadStatus, setLoadStatus] = useState(null);
-  const loaded = useRef(false);
+  const [showSaves, setShowSaves] = useState(false);
+  const [saves, setSaves] = useState({});
+  const [savesLoading, setSavesLoading] = useState(false);
+  const [savePlayerPicker, setSavePlayerPicker] = useState(false);
+  const [saveTargetPlayer, setSaveTargetPlayer] = useState("");
 
-  // Load saved data on mount
-  useEffect(() => {
-    if (loaded.current) return;
-    loaded.current = true;
-    loadGameData("lexicon")
-      .then(({ words: w, players: p }) => {
-        if (Array.isArray(w) && w.length > 0) setWords(w);
-        if (Array.isArray(p) && p.length > 0) setPlayers(p);
-      })
-      .catch(() => {})
-      .finally(() => setLoading(false));
-  }, []);
+  const fetchSaves = async () => {
+    setSavesLoading(true);
+    try {
+      const { saves: s } = await loadSaves("lexicon");
+      setSaves(s || {});
+    } catch { setSaves({}); }
+    setSavesLoading(false);
+  };
 
   const handleSave = async () => {
-    setSaveStatus("saving");
-    try {
-      await saveGameData("lexicon", words, players);
-      setSaveStatus("saved");
-    } catch {
-      setSaveStatus("error");
+    const existingPlayers = Object.keys(saves);
+    if (existingPlayers.length > 0 && !savePlayerPicker) {
+      await fetchSaves();
+      setSavePlayerPicker(true);
+      return;
     }
+    const target = saveTargetPlayer.trim();
+    if (!target) { setError("Enter a player name to save under"); return; }
+    setSaveStatus("saving");
+    setSavePlayerPicker(false);
+    try {
+      await saveWordList("lexicon", target, words);
+      setSaveStatus("saved");
+      setSaveTargetPlayer("");
+      if (showSaves) await fetchSaves();
+    } catch { setSaveStatus("error"); }
     setTimeout(() => setSaveStatus(null), 2000);
   };
 
-  const handleLoad = async () => {
-    setLoadStatus("loading");
-    try {
-      const { words: w, players: p } = await loadGameData("lexicon");
-      if (Array.isArray(w) && w.length > 0) setWords(w);
-      if (Array.isArray(p) && p.length > 0) setPlayers(p);
-      setLoadStatus("loaded");
-    } catch {
-      setLoadStatus("error");
-    }
-    setTimeout(() => setLoadStatus(null), 2000);
+  const handleToggleSaves = async () => {
+    if (!showSaves) await fetchSaves();
+    setShowSaves(!showSaves);
+  };
+
+  const handleDeletePlayer = async (player) => {
+    await deletePlayer("lexicon", player);
+    await fetchSaves();
+  };
+
+  const handleDeleteWordList = async (player, index) => {
+    await deleteWordList("lexicon", player, index);
+    await fetchSaves();
+  };
+
+  const handleLoadWordList = (wordList) => {
+    setWords(wordList);
+    setShowSaves(false);
   };
 
   const addWord = () => {
@@ -444,18 +458,6 @@ function SetupScreen({ onStart, onBack }) {
   };
 
   const totalRounds = Math.ceil(words.length / ROUND_SIZE);
-
-  if (loading) {
-    return (
-      <div className="setup">
-        <div className="logo-area">
-          <div className="logo-icon">🧠</div>
-          <h1 className="logo-title">LEXICON</h1>
-          <p className="logo-sub">Loading saved data...</p>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="setup">
@@ -514,14 +516,71 @@ function SetupScreen({ onStart, onBack }) {
       </div>
 
       {error && <p className="error">{error}</p>}
+
+      {savePlayerPicker && (
+        <div className="section">
+          <h2 className="section-title">Save under which player?</h2>
+          <div className="input-row">
+            <input className="input input-player" placeholder="Player name" value={saveTargetPlayer}
+              onChange={(e) => setSaveTargetPlayer(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && handleSave()} />
+            <button className="add-btn" onClick={handleSave}>Save</button>
+          </div>
+          {Object.keys(saves).length > 0 && (
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 8 }}>
+              {Object.keys(saves).map((p) => (
+                <button key={p} className="player-chip" style={{ cursor: "pointer", border: "none" }}
+                  onClick={() => { setSaveTargetPlayer(p); }}>
+                  {p}
+                </button>
+              ))}
+            </div>
+          )}
+          <button className="back-btn" style={{ marginTop: 8 }} onClick={() => setSavePlayerPicker(false)}>Cancel</button>
+        </div>
+      )}
+
       <div style={{ display: "flex", gap: 8 }}>
-        <button className="newgame-btn" style={{ flex: 1 }} onClick={handleSave} disabled={saveStatus === "saving"}>
+        <button className="newgame-btn" style={{ flex: 1 }} onClick={handleSave} disabled={saveStatus === "saving" || savePlayerPicker}>
           {saveStatus === "saving" ? "Saving..." : saveStatus === "saved" ? "Saved!" : saveStatus === "error" ? "Save Failed" : "Save"}
         </button>
-        <button className="newgame-btn" style={{ flex: 1 }} onClick={handleLoad} disabled={loadStatus === "loading"}>
-          {loadStatus === "loading" ? "Loading..." : loadStatus === "loaded" ? "Loaded!" : loadStatus === "error" ? "Load Failed" : "Load"}
+        <button className="newgame-btn" style={{ flex: 1 }} onClick={handleToggleSaves}>
+          {showSaves ? "Hide Saved" : "Load"}
         </button>
       </div>
+
+      {showSaves && (
+        <div className="section">
+          <h2 className="section-title">Saved Data</h2>
+          {savesLoading ? (
+            <p className="hint">Loading...</p>
+          ) : Object.keys(saves).length === 0 ? (
+            <p className="hint">No saved word lists yet.</p>
+          ) : (
+            Object.entries(saves).map(([player, lists]) => (
+              <div key={player} style={{ marginBottom: 12 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+                  <strong style={{ color: "#e2e8f0", fontSize: 14 }}>{player}</strong>
+                  <button className="chip-x" onClick={() => handleDeletePlayer(player)}>×</button>
+                </div>
+                {lists.map((wl, idx) => (
+                  <div key={idx} className="word-chip" style={{ cursor: "pointer", marginBottom: 4 }}
+                    onClick={() => handleLoadWordList(wl)}>
+                    <div className="word-chip-text">
+                      <span className="def">
+                        #{idx + 1} — {wl.slice(0, 3).map((w) => w.word).join(", ")}
+                        {wl.length > 3 ? ` +${wl.length - 3} more` : ""}
+                      </span>
+                    </div>
+                    <button className="chip-x" onClick={(e) => { e.stopPropagation(); handleDeleteWordList(player, idx); }}>×</button>
+                  </div>
+                ))}
+              </div>
+            ))
+          )}
+        </div>
+      )}
+
       <button className="start-btn" disabled={words.length < 3 || players.length < 1} onClick={() => onStart(words, players)}>
         Start Game
       </button>
