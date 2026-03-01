@@ -395,8 +395,7 @@ function SetupScreen({ onStart, onBack }) {
   };
 
   const handleSave = async () => {
-    const existingPlayers = Object.keys(saves);
-    if (existingPlayers.length > 0 && !savePlayerPicker) {
+    if (!savePlayerPicker) {
       await fetchSaves();
       setSavePlayerPicker(true);
       return;
@@ -526,16 +525,19 @@ function SetupScreen({ onStart, onBack }) {
               onKeyDown={(e) => e.key === "Enter" && handleSave()} />
             <button className="add-btn" onClick={handleSave}>Save</button>
           </div>
-          {Object.keys(saves).length > 0 && (
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 8 }}>
-              {Object.keys(saves).map((p) => (
-                <button key={p} className="player-chip" style={{ cursor: "pointer", border: "none" }}
-                  onClick={() => { setSaveTargetPlayer(p); }}>
-                  {p}
-                </button>
-              ))}
-            </div>
-          )}
+          {(() => {
+            const allNames = [...new Set([...players.map((p) => p.name), ...Object.keys(saves)])];
+            return allNames.length > 0 && (
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 8 }}>
+                {allNames.map((p) => (
+                  <button key={p} className="player-chip" style={{ cursor: "pointer", border: "none" }}
+                    onClick={() => { setSaveTargetPlayer(p); }}>
+                    {p}
+                  </button>
+                ))}
+              </div>
+            );
+          })()}
           <button className="back-btn" style={{ marginTop: 8 }} onClick={() => setSavePlayerPicker(false)}>Cancel</button>
         </div>
       )}

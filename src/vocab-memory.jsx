@@ -322,8 +322,7 @@ function VMSetupScreen({ onStart, onBack }) {
   };
 
   const handleSave = async () => {
-    const existingPlayers = Object.keys(saves);
-    if (existingPlayers.length > 0 && !savePlayerPicker) {
+    if (!savePlayerPicker) {
       await fetchSaves();
       setSavePlayerPicker(true);
       return;
@@ -450,16 +449,19 @@ function VMSetupScreen({ onStart, onBack }) {
               onKeyDown={(e) => e.key === "Enter" && handleSave()} />
             <button className="vm-remove-btn" style={{ background: "rgba(83,215,105,0.2)", color: "#53d769" }} onClick={handleSave}>Save</button>
           </div>
-          {Object.keys(saves).length > 0 && (
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 8 }}>
-              {Object.keys(saves).map((p) => (
-                <button key={p} className="vm-word-tag" style={{ cursor: "pointer", border: "none" }}
-                  onClick={() => setSaveTargetPlayer(p)}>
-                  {p}
-                </button>
-              ))}
-            </div>
-          )}
+          {(() => {
+            const allNames = [...new Set([...playerNames.filter((n) => n.trim()), ...Object.keys(saves)])];
+            return allNames.length > 0 && (
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 8 }}>
+                {allNames.map((p) => (
+                  <button key={p} className="vm-word-tag" style={{ cursor: "pointer", border: "none" }}
+                    onClick={() => setSaveTargetPlayer(p)}>
+                    {p}
+                  </button>
+                ))}
+              </div>
+            );
+          })()}
           <button className="vm-back-btn" style={{ marginTop: 8 }} onClick={() => setSavePlayerPicker(false)}>Cancel</button>
         </div>
       )}
