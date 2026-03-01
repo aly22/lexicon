@@ -383,7 +383,6 @@ function SetupScreen({ onStart, onBack }) {
   const [saves, setSaves] = useState({});
   const [savesLoading, setSavesLoading] = useState(false);
   const [savePlayerPicker, setSavePlayerPicker] = useState(false);
-  const [saveTargetPlayer, setSaveTargetPlayer] = useState("");
 
   const fetchSaves = async () => {
     setSavesLoading(true);
@@ -394,23 +393,28 @@ function SetupScreen({ onStart, onBack }) {
     setSavesLoading(false);
   };
 
-  const handleSave = async () => {
-    if (!savePlayerPicker) {
+  const handleSave = async (playerName) => {
+    if (playerName) {
+      setSaveStatus("saving");
+      setSavePlayerPicker(false);
+      try {
+        await saveWordList("lexicon", playerName, words);
+        setSaveStatus("saved");
+        if (showSaves) await fetchSaves();
+      } catch { setSaveStatus("error"); }
+      setTimeout(() => setSaveStatus(null), 2000);
+      return;
+    }
+    if (players.length === 1) {
+      handleSave(players[0].name);
+      return;
+    }
+    if (players.length > 1) {
       await fetchSaves();
       setSavePlayerPicker(true);
       return;
     }
-    const target = saveTargetPlayer.trim();
-    if (!target) { setError("Enter a player name to save under"); return; }
-    setSaveStatus("saving");
-    setSavePlayerPicker(false);
-    try {
-      await saveWordList("lexicon", target, words);
-      setSaveStatus("saved");
-      setSaveTargetPlayer("");
-      if (showSaves) await fetchSaves();
-    } catch { setSaveStatus("error"); }
-    setTimeout(() => setSaveStatus(null), 2000);
+    setError("Add at least one player to save under");
   };
 
   const handleToggleSaves = async () => {
@@ -519,25 +523,14 @@ function SetupScreen({ onStart, onBack }) {
       {savePlayerPicker && (
         <div className="section">
           <h2 className="section-title">Save under which player?</h2>
-          <div className="input-row">
-            <input className="input input-player" placeholder="Player name" value={saveTargetPlayer}
-              onChange={(e) => setSaveTargetPlayer(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && handleSave()} />
-            <button className="add-btn" onClick={handleSave}>Save</button>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+            {players.map((p) => (
+              <button key={p.name} className="player-chip" style={{ cursor: "pointer", border: "none" }}
+                onClick={() => handleSave(p.name)}>
+                {p.name}
+              </button>
+            ))}
           </div>
-          {(() => {
-            const allNames = [...new Set([...players.map((p) => p.name), ...Object.keys(saves)])];
-            return allNames.length > 0 && (
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 8 }}>
-                {allNames.map((p) => (
-                  <button key={p} className="player-chip" style={{ cursor: "pointer", border: "none" }}
-                    onClick={() => { setSaveTargetPlayer(p); }}>
-                    {p}
-                  </button>
-                ))}
-              </div>
-            );
-          })()}
           <button className="back-btn" style={{ marginTop: 8 }} onClick={() => setSavePlayerPicker(false)}>Cancel</button>
         </div>
       )}

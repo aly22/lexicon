@@ -296,7 +296,6 @@ function VMSetupScreen({ onStart, onBack }) {
   const [saves, setSaves] = useState({});
   const [savesLoading, setSavesLoading] = useState(false);
   const [savePlayerPicker, setSavePlayerPicker] = useState(false);
-  const [saveTargetPlayer, setSaveTargetPlayer] = useState("");
   const [error, setError] = useState("");
 
   const words = useMemo(() => {
@@ -321,23 +320,29 @@ function VMSetupScreen({ onStart, onBack }) {
     setSavesLoading(false);
   };
 
-  const handleSave = async () => {
-    if (!savePlayerPicker) {
+  const handleSave = async (playerName) => {
+    const validNames = playerNames.filter((n) => n.trim());
+    if (playerName) {
+      setSaveStatus("saving");
+      setSavePlayerPicker(false);
+      try {
+        await saveWordList("vm", playerName, words);
+        setSaveStatus("saved");
+        if (showSaves) await fetchSaves();
+      } catch { setSaveStatus("error"); }
+      setTimeout(() => setSaveStatus(null), 2000);
+      return;
+    }
+    if (validNames.length === 1) {
+      handleSave(validNames[0]);
+      return;
+    }
+    if (validNames.length > 1) {
       await fetchSaves();
       setSavePlayerPicker(true);
       return;
     }
-    const target = saveTargetPlayer.trim();
-    if (!target) { setError("Enter a player name to save under"); return; }
-    setSaveStatus("saving");
-    setSavePlayerPicker(false);
-    try {
-      await saveWordList("vm", target, words);
-      setSaveStatus("saved");
-      setSaveTargetPlayer("");
-      if (showSaves) await fetchSaves();
-    } catch { setSaveStatus("error"); }
-    setTimeout(() => setSaveStatus(null), 2000);
+    setError("Add at least one player to save under");
   };
 
   const handleToggleSaves = async () => {
@@ -443,25 +448,14 @@ function VMSetupScreen({ onStart, onBack }) {
       {savePlayerPicker && (
         <div className="vm-section">
           <h2>Save under which player?</h2>
-          <div className="vm-player-row">
-            <input className="vm-input" placeholder="Player name" value={saveTargetPlayer}
-              onChange={(e) => setSaveTargetPlayer(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && handleSave()} />
-            <button className="vm-remove-btn" style={{ background: "rgba(83,215,105,0.2)", color: "#53d769" }} onClick={handleSave}>Save</button>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+            {playerNames.filter((n) => n.trim()).map((p) => (
+              <button key={p} className="vm-word-tag" style={{ cursor: "pointer", border: "none" }}
+                onClick={() => handleSave(p)}>
+                {p}
+              </button>
+            ))}
           </div>
-          {(() => {
-            const allNames = [...new Set([...playerNames.filter((n) => n.trim()), ...Object.keys(saves)])];
-            return allNames.length > 0 && (
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 8 }}>
-                {allNames.map((p) => (
-                  <button key={p} className="vm-word-tag" style={{ cursor: "pointer", border: "none" }}
-                    onClick={() => setSaveTargetPlayer(p)}>
-                    {p}
-                  </button>
-                ))}
-              </div>
-            );
-          })()}
           <button className="vm-back-btn" style={{ marginTop: 8 }} onClick={() => setSavePlayerPicker(false)}>Cancel</button>
         </div>
       )}
