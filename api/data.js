@@ -11,32 +11,37 @@ const KEYS = {
 };
 
 export default async function handler(req, res) {
-  if (req.headers["x-api-key"] !== process.env.LEXICON_API_KEY) {
-    return res.status(401).json({ error: "Unauthorized" });
-  }
+  try {
+    if (req.headers["x-api-key"] !== process.env.LEXICON_API_KEY) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
 
-  const game = req.method === "GET" ? req.query.game : req.body?.game;
-  const keys = KEYS[game];
-  if (!keys) {
-    return res.status(400).json({ error: "Invalid game. Use 'lexicon' or 'vm'." });
-  }
+    const game = req.method === "GET" ? req.query.game : req.body?.game;
+    const keys = KEYS[game];
+    if (!keys) {
+      return res.status(400).json({ error: "Invalid game. Use 'lexicon' or 'vm'." });
+    }
 
-  if (req.method === "GET") {
-    const [words, players] = await redis.pipeline()
-      .get(keys.words)
-      .get(keys.players)
-      .exec();
-    return res.json({ words: words || [], players: players || [] });
-  }
+    if (req.method === "GET") {
+      const results = await redis.pipeline()
+        .get(keys.words)
+        .get(keys.players)
+        .exec();
+      return res.json({ words: results[0] || [], players: results[1] || [] });
+    }
 
-  if (req.method === "POST") {
-    const { words, players } = req.body;
-    const pipe = redis.pipeline();
-    if (words !== undefined) pipe.set(keys.words, words);
-    if (players !== undefined) pipe.set(keys.players, players);
-    await pipe.exec();
-    return res.json({ ok: true });
-  }
+    if (req.method === "POST") {
+      const { words, players } = req.body;
+      const pipe = redis.pipeline();
+      if (words !== undefined) pipe.set(keys.words, words);
+      if (players !== undefined) pipe.set(keys.players, players);
+      await pipe.exec();
+      return res.json({ ok: true });
+    }
 
-  res.status(405).json({ error: "Method not allowed" });
+    res.status(405).json({ error: "Method not allowed" });
+  } catch (err) {
+    console.error("api/data error:", err);
+    res.status(500).json({ error: err.message });
+  }
 }
