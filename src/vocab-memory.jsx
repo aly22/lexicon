@@ -140,7 +140,7 @@ const VM_CSS = `
   .vm-card {
     aspect-ratio: 1/1; perspective: 800px; cursor: pointer;
   }
-  .vm-card.removed { visibility: hidden; pointer-events: none; }
+  .vm-card.removed { pointer-events: none; }
   .vm-card.selected { outline: 3px solid #f5a623; outline-offset: 2px; border-radius: 14px; }
   .vm-card-inner {
     position: relative; width: 100%; height: 100%;
@@ -162,7 +162,7 @@ const VM_CSS = `
   }
   .vm-card-front {
     background: #e8f0fe; color: #1a1a2e; transform: rotateY(180deg);
-    font-family: 'Fredoka', sans-serif; font-size: 0.85rem; line-height: 1.2;
+    font-family: 'Fredoka', sans-serif; font-size: 0.9rem; line-height: 1.2;
     border: 3px solid rgba(0,0,0,0.06); box-shadow: 0 4px 16px rgba(0,0,0,0.4);
   }
   .vm-card.correct .vm-card-front {
