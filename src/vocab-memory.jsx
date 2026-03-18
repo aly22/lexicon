@@ -162,7 +162,7 @@ const VM_CSS = `
   }
   .vm-card-front {
     background: #e8f0fe; color: #1a1a2e; transform: rotateY(180deg);
-    font-family: 'Fredoka', sans-serif; font-size: 1rem;
+    font-family: 'Fredoka', sans-serif; font-size: 0.85rem; line-height: 1.2;
     border: 3px solid rgba(0,0,0,0.06); box-shadow: 0 4px 16px rgba(0,0,0,0.4);
   }
   .vm-card.correct .vm-card-front {
@@ -282,7 +282,7 @@ const VM_CSS = `
     .vm-title { font-size: 1.6rem; }
     .vm-card-grid { grid-template-columns: repeat(auto-fill, minmax(80px, 1fr)); gap: 8px; }
     .vm-card-back { font-size: 1.4rem; }
-    .vm-card-front { font-size: 0.8rem; }
+    .vm-card-front { font-size: 0.7rem; }
     .vm-card-face { padding: 6px; border-radius: 10px; }
     .vm-section { padding: 16px; }
   }
