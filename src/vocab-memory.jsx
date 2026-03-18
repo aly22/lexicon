@@ -304,7 +304,7 @@ function VMSetupScreen({ onStart, onBack }) {
   const words = useMemo(() => {
     const parsed = wordText
       .split(/[,\n]+/)
-      .map(w => w.trim().replace(/[^a-zA-Z0-9]/g, "").toLowerCase())
+      .map(w => w.trim().replace(/[^a-zA-Z0-9\s]/g, "").toLowerCase())
       .filter(w => w.length > 0);
     const seen = new Set();
     const unique = [];
@@ -599,7 +599,7 @@ function VMGameScreen({ words: initialWords, players, memorizeTime: baseTime, on
 
   const submitGuess = useCallback(() => {
     if (selectedIdx === null || processing) return;
-    const cleanGuess = guess.trim().toLowerCase().replace(/[^a-z0-9]/g, "");
+    const cleanGuess = guess.trim().toLowerCase().replace(/[^a-z0-9\s]/g, "");
     if (!cleanGuess) return;
 
     const card = cards[selectedIdx];
