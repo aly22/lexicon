@@ -134,11 +134,11 @@ const VM_CSS = `
 
   /* CARDS */
   .vm-card-grid {
-    display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
     gap: 14px;
   }
   .vm-card {
-    aspect-ratio: 3/4; perspective: 800px; cursor: pointer;
+    aspect-ratio: 1/1; perspective: 800px; cursor: pointer;
   }
   .vm-card.removed { visibility: hidden; pointer-events: none; }
   .vm-card.selected { outline: 3px solid #f5a623; outline-offset: 2px; border-radius: 14px; }
@@ -150,7 +150,7 @@ const VM_CSS = `
   .vm-card-face {
     position: absolute; inset: 0; backface-visibility: hidden;
     border-radius: 14px; display: flex; align-items: center;
-    justify-content: center; padding: 12px; font-weight: 700;
+    justify-content: center; padding: 8px; font-weight: 700;
     text-align: center; word-break: break-word;
   }
   .vm-card-back {
@@ -158,11 +158,11 @@ const VM_CSS = `
     border: 3px solid rgba(255,255,255,0.1);
     box-shadow: 0 4px 16px rgba(0,0,0,0.4);
     color: rgba(255,255,255,0.15); font-family: 'Fredoka', sans-serif;
-    font-size: 2.5rem;
+    font-size: 1.8rem;
   }
   .vm-card-front {
     background: #e8f0fe; color: #1a1a2e; transform: rotateY(180deg);
-    font-family: 'Fredoka', sans-serif; font-size: 1.15rem;
+    font-family: 'Fredoka', sans-serif; font-size: 1rem;
     border: 3px solid rgba(0,0,0,0.06); box-shadow: 0 4px 16px rgba(0,0,0,0.4);
   }
   .vm-card.correct .vm-card-front {
@@ -280,7 +280,10 @@ const VM_CSS = `
 
   @media (max-width: 500px) {
     .vm-title { font-size: 1.6rem; }
-    .vm-card-grid { grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 10px; }
+    .vm-card-grid { grid-template-columns: repeat(auto-fill, minmax(80px, 1fr)); gap: 8px; }
+    .vm-card-back { font-size: 1.4rem; }
+    .vm-card-front { font-size: 0.8rem; }
+    .vm-card-face { padding: 6px; border-radius: 10px; }
     .vm-section { padding: 16px; }
   }
 `;
